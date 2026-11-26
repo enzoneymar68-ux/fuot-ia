@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>Fuot IA</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#263750;--blue:#3978d6;--text:#edf4ff;--muted:#9aabc4}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#101d32,#080e18 65%);font:16px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);min-height:100vh}
+.app{max-width:760px;margin:auto;min-height:100vh;display:flex;flex-direction:column;padding:16px}
+header{display:flex;align-items:center;gap:12px;padding:10px 2px 18px;border-bottom:1px solid var(--line)}
+.logo{width:46px;height:46px;border-radius:15px;background:linear-gradient(145deg,#4b8ff0,#1c3761);display:grid;place-items:center;font-size:27px;font-weight:800;box-shadow:0 8px 28px #1e5bb455}
+h1{font-size:21px;margin:0}header p{margin:2px 0 0;color:var(--muted);font-size:12px;letter-spacing:1px}
+.status{margin-left:auto;color:#8de0b0;font-size:12px}
+main{flex:1;padding:20px 0;display:flex;flex-direction:column;gap:14px}
+.welcome{padding:20px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,#172943,#101a2b)}
+.welcome h2{margin:0 0 8px;font-size:22px}.welcome p{margin:0;color:var(--muted);line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid #35527a;background:#182b46;color:#cfe2ff;padding:8px 11px;border-radius:999px;font-size:13px}
+.notice{border:1px solid #6d5527;background:#302817;color:#f3dba5;border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.45}
+#messages{display:flex;flex-direction:column;gap:12px}.msg{max-width:92%;padding:13px 15px;border-radius:16px;white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}.user{align-self:flex-end;background:#244c80}.bot{align-self:flex-start;background:#17263b;border:1px solid var(--line)}.bot small{display:block;color:#a9c9f5;margin-bottom:5px;font-weight:700}
+.composer{position:sticky;bottom:0;background:#0b1220;padding:12px 0 max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+select,textarea,button{font:inherit}select{width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);background:#121d30;color:var(--text);margin-bottom:9px}
+.entry{display:flex;gap:8px}textarea{flex:1;min-height:50px;max-height:130px;resize:vertical;padding:13px;border-radius:14px;border:1px solid var(--line);background:#121d30;color:var(--text)}button{border:0;border-radius:14px;background:var(--blue);color:white;padding:0 18px;font-weight:700}
+.foot{text-align:center;color:#71839d;font-size:11px;padding:8px}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="logo">F</div><div><h1>Fuot IA</h1><p>ASSISTENTE DE PROGRAMAÇÃO</p></div><div class="status">● Protótipo</div></header>
+<main>
+<section class="welcome"><h2>Olá! Eu sou a Fuot IA.</h2><p>Seu espaço para criar, entender e corrigir códigos. Vamos começar por Lua e Luau.</p><div class="chips"><button class="chip" onclick="quick('Explique como funciona uma variável em Lua.')">Aprender Lua</button><button class="chip" onclick="quick('Crie um script Lua simples e explique cada linha.')">Criar script</button><button class="chip" onclick="quick('Como encontro e corrijo erros em um script Lua?')">Corrigir erros</button></div></section>
+<div class="notice"><b>Modo demonstração:</b> esta primeira versão é a interface. Ela ainda não está conectada a um modelo de IA; não envia mensagens para nenhum serviço.</div>
+<div id="messages"><div class="msg bot"><small>Fuot IA · demonstração</small>Escolha uma linguagem e envie uma pergunta. Esta versão testa a interface; a conexão com o cérebro de IA será a próxima etapa.</div></div>
+</main>
+<div class="composer">
+<select id="language" aria-label="Linguagem"><option>Lua</option><option>Luau (Roblox)</option><option>Python</option><option>JavaScript</option><option>Outra linguagem</option></select>
+<div class="entry"><textarea id="prompt" placeholder="Peça um código ou tire uma dúvida..." rows="2"></textarea><button onclick="send()">Enviar</button></div>
+<div class="foot">Fuot IA · Protótipo inicial · Suas mensagens ficam apenas nesta tela</div>
+</div>
+</div>
+<script>
+const messages=document.getElementById('messages'),input=document.getElementById('prompt');
+function quick(t){input.value=t;input.focus()}
+function send(){const t=input.value.trim();if(!t)return;const u=document.createElement('div');u.className='msg user';u.textContent=t;messages.appendChild(u);const b=document.createElement('div');b.className='msg bot';const s=document.createElement('small');s.textContent='Fuot IA · demonstração';b.appendChild(s);b.append('Recebi sua pergunta sobre '+document.getElementById('language').value+'. A interface está funcionando, mas ainda preciso conectar um modelo de IA para gerar uma resposta real.');messages.appendChild(b);input.value='';messages.scrollIntoView({behavior:'smooth',block:'end'})}
+input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+</script>
+</body>
+</html>
