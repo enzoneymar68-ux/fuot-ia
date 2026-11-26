@@ -1,365 +1,405 @@
-// ========================================
-// FUOT IA — CLOUDFLARE WORKER
-// ========================================
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080808">
+<title>Fuot IA</title>
 
-const MODEL = "@cf/zai-org/glm-4.7-flash";
-const VISION = "@cf/meta/llama-3.2-11b-vision-instruct";
-const IMAGE = "@cf/black-forest-labs/flux-1-schnell";
-const WHISPER = "@cf/openai/whisper-large-v3-turbo";
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
 
-const MAX_BODY_SIZE = 10 * 1024 * 1024;
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#080808;color:#eee;font-family:Arial,sans-serif}
+button,input,textarea{font:inherit}
+button{cursor:pointer}
+#app{min-height:100vh;display:flex;flex-direction:column}
+header{height:62px;border-bottom:1px solid #252525;display:flex;align-items:center;padding:0 14px;gap:14px;background:#0b0b0b}
+#menuBtn{font-size:25px;background:none;color:white;border:0}
+.logo{font-size:20px;font-weight:bold}
+.logo span{color:#a78bfa}
+#newChat{margin-left:auto;background:#222;color:white;border:1px solid #333;padding:9px 12px;border-radius:9px}
+main{width:100%;max-width:850px;margin:auto;flex:1;padding:18px 14px 150px}
+#welcome{text-align:center;margin:14vh auto 35px}
+#welcome h1{font-size:34px;margin-bottom:8px}
+#welcome p{color:#999}
+#messages{display:flex;flex-direction:column;gap:18px}
+.msg{max-width:95%;padding:14px 16px;border-radius:15px;line-height:1.6;overflow-wrap:anywhere}
+.user{align-self:flex-end;background:#272333}
+.bot{align-self:flex-start;background:#151515;border:1px solid #292929;width:100%}
+.msg pre{background:#080808;padding:12px;border-radius:9px;overflow:auto}
+.msg code{font-family:monospace}
+.msg img{max-width:100%;border-radius:12px}
+.msg a{color:#b9a3ff}
+#composer{position:fixed;bottom:0;left:0;right:0;background:linear-gradient(transparent,#080808 20%);padding:12px 14px 18px}
+#composerInner{max-width:850px;margin:auto;background:#171717;border:1px solid #393939;border-radius:18px;padding:10px}
+#prompt{width:100%;resize:none;background:transparent;border:0;outline:0;color:white;min-height:48px;max-height:150px;padding:8px}
+.tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.tool{background:#282828;border:0;color:#ddd;border-radius:9px;padding:9px 11px}
+#send{margin-left:auto;background:#8b5cf6;color:white;border:0;border-radius:10px;padding:10px 17px;font-weight:bold}
+#preview{max-width:100px;max-height:90px;border-radius:8px;display:none}
+#sidebar{display:none;position:fixed;inset:0;z-index:10;background:#0009}
+#side{width:min(300px,85vw);height:100%;background:#111;padding:18px;border-right:1px solid #333}
+#side button{display:block;width:100%;text-align:left;margin:7px 0;padding:13px;background:#202020;color:white;border:0;border-radius:9px}
+#side .close{width:auto;margin-left:auto}
+#legal,#login{position:fixed;inset:0;z-index:20;background:#090909;color:white;overflow:auto;padding:22px;display:none}
+.panel{max-width:760px;margin:25px auto;line-height:1.65}
+.panel button{padding:10px;background:#292929;color:white;border:0;border-radius:8px}
+#login{display:block;text-align:center;padding-top:20vh}
+#login button{display:block;margin:12px auto;padding:13px 20px;background:#242424;color:white;border:1px solid #444;border-radius:10px}
+#security{max-width:320px;margin:15px auto}
+small,.muted{color:#999}
+#status{font-size:12px;color:#aaa;padding:5px}
+</style>
+</head>
 
-const SYSTEM_PROMPT = `
-Você é a Fuot IA, uma inteligência artificial útil, educada e competente.
+<body>
+<div id="login">
+  <h1>Fuot <span style="color:#a78bfa">IA</span></h1>
+  <p>Seu assistente de inteligência artificial.</p>
+  <button onclick="enterGuest()">Continuar sem conta</button>
+  <button onclick="alert('Login com Google estará disponível quando a autenticação for configurada.')">Continuar com Google — em breve</button>
+  <button onclick="alert('Login por e-mail estará disponível quando a autenticação for configurada.')">Entrar com e-mail — em breve</button>
+  <p class="muted">Ao continuar, você deverá aceitar os Termos de Uso.</p>
+</div>
 
-REGRAS:
-- Responda no mesmo idioma utilizado pelo usuário.
-- Seja especialista em programação em TODAS as linguagens: Lua, Luau,
-Python, JavaScript, TypeScript, HTML, CSS, C, C++, C#, Java, PHP, SQL
-e outras.
-- Programação e tarefas gerais têm a mesma importância.
-- Ajude também com matemática, estudos, escrita, explicações,
-planejamento, criatividade e dúvidas do cotidiano.
-- Em programação, forneça códigos completos quando solicitado.
-- Não invente bibliotecas, funções ou APIs.
-- Quando faltar informação importante, faça uma pergunta objetiva.
-- Explique erros e possíveis soluções.
-- Use Markdown, títulos, listas e blocos de código.
-- Não diga que executou ou testou códigos se não executou.
-- Não invente fontes ou resultados de pesquisa.
-- Avise quando não tiver certeza.
-- Não ajude com crimes, invasões, malware ou atividades perigosas.
-- Seja clara, organizada e direta.
-`;
+<div id="app" style="display:none">
+<header>
+  <button id="menuBtn" onclick="openMenu()">☰</button>
+  <div class="logo">Fuot <span>IA</span></div>
+  <button id="newChat" onclick="newChat()">+ Novo chat</button>
+</header>
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=UTF-8",
-      "Cache-Control": "no-store",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    }
-  });
+<main>
+  <section id="welcome">
+    <h1>Como posso ajudar?</h1>
+    <p>Programação, matemática, estudos, ideias e muito mais.</p>
+  </section>
+  <div id="messages"></div>
+</main>
+
+<div id="composer">
+  <div id="composerInner">
+    <div id="status"></div>
+    <img id="preview">
+    <textarea id="prompt" placeholder="Pergunte alguma coisa..." rows="2"></textarea>
+    <div class="tools">
+      <button class="tool" onclick="document.getElementById('imageFile').click()">＋ Imagem</button>
+      <button class="tool" onclick="document.getElementById('audioFile').click()">Áudio</button>
+      <button class="tool" onclick="toggleRecord()">🎙</button>
+      <button class="tool" onclick="chooseMode('search')">Pesquisar</button>
+      <button class="tool" onclick="chooseMode('read_url')">Ler link</button>
+      <button class="tool" onclick="chooseMode('generate_image')">Criar imagem</button>
+      <button id="send" onclick="sendMessage()">Enviar ↑</button>
+    </div>
+    <input id="imageFile" type="file" accept="image/*" hidden onchange="loadImage(this.files[0])">
+    <input id="audioFile" type="file" accept="audio/*" hidden onchange="transcribeFile(this.files[0])">
+  </div>
+  <p style="text-align:center;font-size:11px;color:#777">A Fuot IA pode cometer erros. Confira informações importantes.</p>
+</div>
+</div>
+
+<div id="sidebar" onclick="closeMenu(event)">
+ <div id="side">
+  <button class="close" onclick="closeMenu()">Fechar ×</button>
+  <button onclick="newChat();closeMenu()">＋ Novo chat</button>
+  <button onclick="showHistory();closeMenu()">Conversas anteriores</button>
+  <button onclick="chooseMode('search');closeMenu()">Pesquisar na internet</button>
+  <button onclick="chooseMode('read_url');closeMenu()">Ler um link</button>
+  <button onclick="chooseMode('generate_image');closeMenu()">Criar imagem</button>
+  <button onclick="document.getElementById('imageFile').click();closeMenu()">Enviar imagem</button>
+  <button onclick="document.getElementById('audioFile').click();closeMenu()">Enviar áudio</button>
+  <button onclick="showLegal();closeMenu()">Termos e privacidade</button>
+  <button onclick="alert('As conversas de visitante ficam salvas neste dispositivo.')">Configurações</button>
+ </div>
+</div>
+
+<div id="legal">
+ <div class="panel">
+  <button onclick="closeLegal()">Fechar</button>
+  <h1>Termos de Uso — Fuot IA</h1>
+  <p>Última atualização: 26 de novembro de 2026.</p>
+  <h2>1. Sobre o serviço</h2>
+  <p>A Fuot IA oferece ferramentas de inteligência artificial para programação, estudos, textos, cálculos, análise e criação de conteúdo. As funções podem mudar ou ficar temporariamente indisponíveis.</p>
+  <h2>2. Uso permitido</h2>
+  <p>O usuário deve utilizar a plataforma de forma legal e responsável. É proibido utilizar o serviço para golpes, fraudes, invasões, malware, ataques, assédio, violação de direitos ou qualquer atividade ilegal.</p>
+  <h2>3. Respostas da IA</h2>
+  <p>As respostas podem conter erros, informações incompletas ou desatualizadas. Verifique códigos, cálculos e informações antes de utilizá-los. A Fuot IA não garante resultados perfeitos e não substitui profissionais qualificados.</p>
+  <h2>4. Arquivos e conteúdo</h2>
+  <p>O usuário é responsável por ter autorização para enviar imagens, áudios, textos e outros materiais. Não envie senhas, documentos ou dados confidenciais desnecessários.</p>
+  <h2>5. Limites e suspensão</h2>
+  <p>O serviço pode aplicar limites, bloquear requisições abusivas ou suspender o acesso em caso de violação destes termos.</p>
+  <h2>6. Disponibilidade</h2>
+  <p>Não garantimos funcionamento ininterrupto. Recursos e condições podem ser alterados.</p>
+  <h2>7. Contato</h2>
+  <p>Contato: [INSIRA O E-MAIL OFICIAL DA FUOT IA].</p>
+
+  <hr>
+  <h1>Política de Privacidade</h1>
+  <h2>1. Dados processados</h2>
+  <p>A plataforma processa mensagens, arquivos enviados e dados técnicos necessários para prestar o serviço, proteger a plataforma e evitar abusos.</p>
+  <h2>2. Finalidades</h2>
+  <p>Os dados são utilizados para responder às solicitações, analisar imagens, transcrever áudios, pesquisar informações e manter a segurança do serviço.</p>
+  <h2>3. Serviços externos</h2>
+  <p>As solicitações podem ser processadas pela Cloudflare e pelos modelos de inteligência artificial utilizados pela Fuot IA. Esses provedores recebem os dados necessários para executar as funções solicitadas.</p>
+  <h2>4. Histórico</h2>
+  <p>O histórico de visitante é armazenado localmente no navegador deste dispositivo. Limpar os dados do navegador pode apagar esse histórico. Isso não significa que provedores de infraestrutura não mantenham registros técnicos próprios.</p>
+  <h2>5. Segurança e direitos</h2>
+  <p>Adotamos medidas de segurança, mas nenhum sistema é totalmente livre de riscos. Solicitações relacionadas a dados pessoais podem ser encaminhadas ao contato oficial, conforme a LGPD.</p>
+  <h2>6. Retenção e contato</h2>
+  <p>Os dados técnicos podem ser mantidos pelo período necessário à segurança e operação dos serviços envolvidos, conforme suas políticas. Contato: [INSIRA O E-MAIL OFICIAL DA FUOT IA].</p>
+
+  <hr>
+  <label><input type="checkbox" id="acceptTerms"> Li e aceito os Termos de Uso e a Política de Privacidade.</label>
+  <p><button onclick="acceptLegal()">Aceitar e continuar</button></p>
+  <small>Este texto é um modelo inicial e deve ser revisado juridicamente antes do lançamento público. Preencha o contato e defina os prazos e processos reais de tratamento de dados.</small>
+ </div>
+</div>
+
+<script>
+const API_URL = "https://fuot-ia-api.ericksouzaneri8.workers.dev";
+const TURNSTILE_SITE_KEY = "COLOQUE_SUA_SITE_KEY_AQUI";
+
+let mode = "chat";
+let selectedImage = "";
+let captchaToken = "";
+let recorder = null;
+let recordedChunks = [];
+let historyData = JSON.parse(localStorage.getItem("fuot_history") || "[]");
+
+const $ = id => document.getElementById(id);
+
+function enterGuest(){
+  if(localStorage.getItem("fuot_accepted") !== "yes"){
+    $("login").style.display="none";
+    showLegal();
+    return;
+  }
+  $("login").style.display="none";
+  $("app").style.display="flex";
+  renderHistory();
 }
 
-async function verifyTurnstile(token, request, env) {
-  if (!token || !env.TURNSTILE_SECRET) return false;
+function showLegal(){ $("legal").style.display="block"; }
+function closeLegal(){ $("legal").style.display="none"; }
 
-  const form = new FormData();
-  form.append("secret", env.TURNSTILE_SECRET);
-  form.append("response", token);
+function acceptLegal(){
+  if(!$("acceptTerms").checked){
+    alert("Você precisa aceitar os termos para continuar.");
+    return;
+  }
+  localStorage.setItem("fuot_accepted","yes");
+  closeLegal();
+  $("login").style.display="none";
+  $("app").style.display="flex";
+}
 
-  const ip = request.headers.get("CF-Connecting-IP");
-  if (ip) form.append("remoteip", ip);
-
-  try {
-    const response = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      { method: "POST", body: form }
-    );
-
-    const result = await response.json();
-    return result.success === true;
-  } catch {
-    return false;
+function openMenu(){ $("sidebar").style.display="block"; }
+function closeMenu(e){
+  if(!e || e.target.id==="sidebar" || e.target.closest("#side button")){
+    $("sidebar").style.display="none";
   }
 }
 
-function extractBase64(dataUrl) {
-  if (typeof dataUrl !== "string") return "";
-  return dataUrl.replace(/^data:[^,]+,/, "");
+function chooseMode(value){
+  mode=value;
+  const names={
+    search:"Pesquisar na internet: escreva sua pergunta",
+    read_url:"Ler link: cole o endereço da página",
+    generate_image:"Descreva a imagem que deseja criar",
+    chat:"Pergunte alguma coisa..."
+  };
+  $("prompt").placeholder=names[value] || names.chat;
+  $("prompt").focus();
 }
 
-function validUpload(data) {
-  if (data.image) {
-    if (typeof data.image !== "string" ||
-        !data.image.startsWith("data:image/")) {
-      return "Formato de imagem inválido.";
-    }
-    if (data.image.length > 8 * 1024 * 1024) {
-      return "Imagem muito grande. Limite de 7 MB.";
-    }
-  }
-
-  if (data.audio) {
-    if (typeof data.audio !== "string" ||
-        !data.audio.startsWith("data:audio/")) {
-      return "Formato de áudio inválido.";
-    }
-    if (data.audio.length > 8 * 1024 * 1024) {
-      return "Áudio muito grande. Limite de 7 MB.";
-    }
-  }
-
-  return null;
+function newChat(){
+  $("messages").innerHTML="";
+  $("welcome").style.display="block";
+  $("prompt").value="";
+  selectedImage="";
+  $("preview").style.display="none";
+  mode="chat";
+  $("prompt").placeholder="Pergunte alguma coisa...";
 }
 
-function safeUrl(value) {
-  try {
-    const url = new URL(value);
+function addMessage(role, content, image){
+  $("welcome").style.display="none";
+  const div=document.createElement("div");
+  div.className="msg "+(role==="user"?"user":"bot");
+  if(image){
+    const img=document.createElement("img");
+    img.src=image;
+    div.appendChild(img);
+  }
+  if(role==="bot"){
+    const html=window.marked ? marked.parse(content || "") : (content || "");
+    div.insertAdjacentHTML("beforeend",DOMPurify.sanitize(html));
+  }else{
+    const p=document.createElement("div");
+    p.textContent=content;
+    div.appendChild(p);
+  }
+  $("messages").appendChild(div);
+  window.scrollTo(0,document.body.scrollHeight);
+  return div;
+}
 
-    if (url.protocol !== "https:") return false;
+function saveHistory(){
+  localStorage.setItem("fuot_history",JSON.stringify(historyData.slice(-60)));
+}
 
-    const host = url.hostname.toLowerCase();
+function renderHistory(){
+  saveHistory();
+}
 
-    if (
-      host === "localhost" ||
-      host === "127.0.0.1" ||
-      host === "::1" ||
-      host.endsWith(".local") ||
-      host.startsWith("10.") ||
-      host.startsWith("192.168.") ||
-      host.startsWith("172.16.")
-    ) return false;
+function showHistory(){
+  if(!historyData.length){alert("Ainda não há conversas salvas.");return;}
+  const list=historyData.map((x,i)=>(i+1)+". "+x.slice(0,90)).join("\n\n");
+  alert("Histórico neste dispositivo:\n\n"+list);
+}
 
-    return url;
-  } catch {
-    return false;
+function loadImage(file){
+  if(!file)return;
+  if(!file.type.startsWith("image/")){alert("Escolha uma imagem.");return;}
+  if(file.size>7*1024*1024){alert("A imagem deve ter até 7 MB.");return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement("canvas");
+      const scale=Math.min(1,1400/Math.max(img.width,img.height));
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+      selectedImage=canvas.toDataURL("image/jpeg",0.82);
+      $("preview").src=selectedImage;
+      $("preview").style.display="block";
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function transcribeFile(file){
+  if(!file)return;
+  if(file.size>7*1024*1024){alert("O áudio deve ter até 7 MB.");return;}
+  const reader=new FileReader();
+  reader.onload=async()=>{
+    try{
+      $("status").textContent="Transcrevendo áudio...";
+      const result=await apiRequest({action:"transcribe",audio:reader.result});
+      $("prompt").value=result.text || result.transcription || "";
+      $("status").textContent="Transcrição pronta. Confira e envie.";
+    }catch(e){$("status").textContent="Erro: "+e.message;}
+  };
+  reader.readAsDataURL(file);
+}
+
+async function toggleRecord(){
+  if(recorder && recorder.state==="recording"){
+    recorder.stop();
+    $("status").textContent="Finalizando gravação...";
+    return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recorder=new MediaRecorder(stream);
+    recordedChunks=[];
+    recorder.ondataavailable=e=>{if(e.data.size)recordedChunks.push(e.data);};
+    recorder.onstop=()=>{
+      const blob=new Blob(recordedChunks,{type:recorder.mimeType || "audio/webm"});
+      stream.getTracks().forEach(t=>t.stop());
+      const file=new File([blob],"gravacao.webm",{type:blob.type});
+      transcribeFile(file);
+    };
+    recorder.start();
+    $("status").textContent="Gravando... toque no microfone para parar.";
+  }catch(e){alert("Não foi possível acessar o microfone. Verifique a permissão do navegador.");}
+}
+
+function getCaptcha(){
+  if(!captchaToken)throw new Error("Faça a verificação antirobô antes de enviar.");
+  const token=captchaToken;
+  captchaToken="";
+  return token;
+}
+
+async function apiRequest(payload){
+  const token=getCaptcha();
+  try{
+    const response=await fetch(API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({...payload,turnstileToken:token})
+    });
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error || "Erro no servidor.");
+    return data;
+  }finally{
+    if(window.turnstile)window.turnstile.reset();
   }
 }
 
-async function readPage(address) {
-  const url = safeUrl(address);
-  if (!url) {
-    throw new Error("Envie um endereço HTTPS público válido.");
+async function sendMessage(){
+  const prompt=$("prompt").value.trim();
+  if(!prompt && !selectedImage)return;
+  if(localStorage.getItem("fuot_accepted")!=="yes"){
+    showLegal();return;
   }
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      "User-Agent": "FuotIA/1.0",
-      "Accept": "text/html,text/plain"
-    },
-    redirect: "follow"
-  });
+  addMessage("user",prompt,selectedImage);
+  historyData.push(prompt || "Imagem enviada");
+  saveHistory();
 
-  if (!response.ok) {
-    throw new Error("Não consegui abrir essa página.");
+  $("prompt").value="";
+  $("status").textContent="A Fuot IA está pensando...";
+  const image=selectedImage;
+  selectedImage="";
+  $("preview").style.display="none";
+
+  try{
+    let result;
+    if(mode==="generate_image"){
+      result=await apiRequest({action:"generate_image",prompt});
+      if(result.image){
+        const div=addMessage("bot","Imagem criada!");
+        const img=document.createElement("img");
+        img.src=result.image.startsWith("data:")?result.image:"data:image/png;base64,"+result.image;
+        div.appendChild(img);
+      }else addMessage("bot",result.text || "Não foi possível criar a imagem.");
+    }else if(mode==="search"){
+      result=await apiRequest({action:"search",query:prompt});
+      const answer=await apiRequest({action:"chat",message:"Responda à pergunta usando estes resultados de pesquisa. Informe quando não houver confirmação.\nPergunta: "+prompt+"\nResultados: "+JSON.stringify(result.results || result)});
+      addMessage("bot",answer.text || answer.response || "Não consegui responder.");
+    }else if(mode==="read_url"){
+      result=await apiRequest({action:"read_url",url:prompt});
+      const answer=await apiRequest({action:"chat",message:"Resuma e explique o conteúdo desta página:\n"+(result.content || "")});
+      addMessage("bot",answer.text || answer.response || "Não consegui ler a página.");
+    }else{
+      result=await apiRequest({action:"chat",message:prompt,image});
+      addMessage("bot",result.text || result.response || "Não recebi uma resposta.");
+    }
+  }catch(e){
+    addMessage("bot","Não foi possível concluir: "+e.message);
   }
-
-  const type = response.headers.get("content-type") || "";
-
-  if (!type.includes("text/html") &&
-      !type.includes("text/plain")) {
-    throw new Error("Esse tipo de página não pode ser lido.");
-  }
-
-  const html = await response.text();
-
-  const content = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 18000);
-
-  return content;
+  $("status").textContent="";
 }
 
-export default {
-  async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type"
-        }
-      });
-    }
+$("prompt").addEventListener("keydown",e=>{
+  if(e.key==="Enter" && !e.shiftKey){e.preventDefault();sendMessage();}
+});
 
-    if (request.method !== "POST") {
-      return json({ error: "Método não permitido." }, 405);
-    }
+window.fuotCaptchaOk=function(token){captchaToken=token;};
+</script>
 
-    try {
-      const length = Number(
-        request.headers.get("Content-Length") || 0
-      );
-
-      if (length > MAX_BODY_SIZE) {
-        return json({ error: "Requisição muito grande." }, 413);
-      }
-
-      const raw = await request.text();
-
-      if (raw.length > MAX_BODY_SIZE) {
-        return json({ error: "Requisição muito grande." }, 413);
-      }
-
-      let data;
-
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        return json({ error: "Dados inválidos." }, 400);
-      }
-
-      // Verificação obrigatória antirobô.
-      const verified = await verifyTurnstile(
-        data.turnstileToken,
-        request,
-        env
-      );
-
-      if (!verified) {
-        return json({
-          error: "Verificação de segurança inválida. Faça o teste novamente."
-        }, 403);
-      }
-
-      const uploadError = validUpload(data);
-
-      if (uploadError) {
-        return json({ error: uploadError }, 413);
-      }
-
-      // Limite opcional usando um Rate Limiting binding.
-      // Se configurar RATE_LIMITER no Worker, ele será aplicado.
-      if (env.RATE_LIMITER) {
-        const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-        const result = await env.RATE_LIMITER.limit({ key: ip });
-
-        if (!result.success) {
-          return json({
-            error: "Muitas solicitações. Aguarde um minuto e tente novamente."
-          }, 429);
-        }
-      }
-
-      const action = data.action || "chat";
-
-      // PESQUISA NA INTERNET
-      if (action === "search") {
-        if (!data.query || typeof data.query !== "string") {
-          return json({ error: "Digite o que deseja pesquisar." }, 400);
-        }
-
-        if (!env.AI.websearch) {
-          return json({
-            error: "Pesquisa não configurada. Verifique o AI Gateway da Cloudflare."
-          }, 503);
-        }
-
-        const results = await env.AI.websearch({
-          gatewayId: "default",
-          provider: "exa",
-          query: data.query.slice(0, 500),
-          limit: 5
-        });
-
-        return json({ results });
-      }
-
-      // LEITURA DE LINKS
-      if (action === "read_url") {
-        if (!data.url) {
-          return json({ error: "Informe o link que deseja ler." }, 400);
-        }
-
-        const content = await readPage(data.url);
-        return json({ content });
-      }
-
-      // TRANSCRIÇÃO DE ÁUDIO
-      if (action === "transcribe") {
-        if (!data.audio) {
-          return json({ error: "Envie um áudio." }, 400);
-        }
-
-        const audioBase64 = extractBase64(data.audio);
-
-        const result = await env.AI.run(WHISPER, {
-          audio: audioBase64
-        });
-
-        return json({
-          text: result.text || result.transcription || ""
-        });
-      }
-
-      // CRIAÇÃO DE IMAGENS
-      if (action === "generate_image") {
-        if (!data.prompt || typeof data.prompt !== "string") {
-          return json({ error: "Descreva a imagem que deseja criar." }, 400);
-        }
-
-        const result = await env.AI.run(IMAGE, {
-          prompt: data.prompt.slice(0, 1500),
-          num_steps: 4
-        });
-
-        if (!result.image) {
-          return json({ error: "O modelo não retornou uma imagem." }, 502);
-        }
-
-        return json({
-          image: "data:image/jpeg;base64," + result.image
-        });
-      }
-
-      // CONVERSA E ANÁLISE DE IMAGENS
-      if (action === "chat") {
-        const userMessage = String(data.message || "").slice(0, 12000);
-
-        if (!userMessage && !data.image) {
-          return json({ error: "Digite uma mensagem." }, 400);
-        }
-
-        const messages = [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMessage || "Analise esta imagem." }
-        ];
-
-        let result;
-
-        if (data.image) {
-          const imageBase64 = extractBase64(data.image);
-
-          result = await env.AI.run(VISION, {
-            messages,
-            image: imageBase64,
-            max_tokens: 1800
-          });
-        } else {
-          result = await env.AI.run(MODEL, {
-            messages,
-            max_tokens: 3000
-          });
-        }
-
-        const answer =
-          result.response ||
-          result.output_text ||
-          result.choices?.[0]?.message?.content ||
-          result.choices?.[0]?.text ||
-          "";
-
-        if (!answer) {
-          return json({
-            error: "A inteligência artificial não retornou uma resposta."
-          }, 502);
-        }
-
-        return json({ text: answer });
-      }
-
-      return json({ error: "Função não reconhecida." }, 400);
-
-    } catch (error) {
-      return json({
-        error: "Ocorreu um erro ao processar sua solicitação.",
-        details: String(error.message || error).slice(0, 300)
-      }, 500);
-    }
-  }
-};
+<div id="turnstile-container" style="position:fixed;bottom:3px;right:3px;z-index:5">
+  <div class="cf-turnstile"
+       data-sitekey="COLOQUE_SUA_SITE_KEY_AQUI"
+       data-callback="fuotCaptchaOk">
+  </div>
+</div>
+</body>
+</html>
