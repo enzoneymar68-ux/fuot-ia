@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,14 +6,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#09090f">
 <title>Fuot IA</title>
+
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#09090f;color:#f4f4fa;font-family:Arial,sans-serif;height:100dvh;overflow:hidden}
-button,textarea{font:inherit}
+button,textarea,input{font:inherit}
 button{cursor:pointer}
 button:disabled{opacity:.55;cursor:not-allowed}
+a{color:#c4b5fd}
 .app{height:100dvh;display:flex}
 .sidebar{width:270px;background:#11111b;border-right:1px solid #29293a;padding:15px;display:flex;flex-direction:column;gap:9px;position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:.2s;overflow-y:auto}
 .sidebar.open{transform:translateX(0)}
@@ -24,8 +29,13 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .topbar{height:58px;min-height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid #29293a}
 .spacer{flex:1}
 #messages{flex:1;overflow:auto;padding:20px 15px;display:flex;flex-direction:column;gap:17px}
-.welcome{margin:auto;text-align:center;max-width:550px}
+.welcome{margin:auto;text-align:center;max-width:550px;padding:15px;width:100%}
 .welcome p{color:#aaa;line-height:1.6}
+.welcome-actions{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:20px}
+.primary-btn,.secondary-btn{border:0;border-radius:11px;padding:12px 17px;color:white}
+.primary-btn{background:#8b5cf6}
+.secondary-btn{background:#252538;border:1px solid #41415a}
+.welcome-legal{font-size:12px;color:#999;margin-top:20px}
 .message{max-width:850px;width:100%;margin:0 auto;line-height:1.65;overflow-wrap:anywhere}
 .user{background:#191925;border:1px solid #303044;border-radius:17px;padding:13px 16px;max-width:780px}
 .assistant{padding:5px 3px}
@@ -40,7 +50,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 #humanArea{display:flex;align-items:center;gap:10px;padding:8px 2px}
 #humanCheck{width:25px;height:25px;min-width:25px;border:2px solid #77778d;border-radius:6px;background:#171722;color:white;display:grid;place-items:center;padding:0;font-size:17px}
 #humanCheck.approved{background:#245b3c;border-color:#49bd7a}
-#humanMessage{font-size:12px;color:#c4b5fd}
+#humanMessage{font-size:12px;color:#c4b5fd;padding:0 2px 8px}
 .hint{text-align:center;color:#999;font-size:11px;margin-top:8px}
 .status{font-size:12px;color:#aaa}
 .overlay{display:none;position:fixed;inset:0;background:#0009;z-index:4}
@@ -49,7 +59,11 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .modal{position:fixed;inset:0;background:#000b;z-index:10;display:grid;place-items:center;padding:15px}
 .modal-card{background:#151520;border:1px solid #343449;border-radius:16px;padding:20px;max-width:540px;width:100%;max-height:85dvh;overflow:auto;line-height:1.6}
 .modal-card button{background:#8b5cf6;color:white;border:0;border-radius:9px;padding:10px 15px}
-.modal-card a{color:#c4b5fd}
+.modal-card input{display:block;width:100%;margin:8px 0 13px;padding:12px;background:#09090f;border:1px solid #41415a;border-radius:9px;color:white}
+.modal-card .wide{width:100%;margin:5px 0}
+.modal-card .secondary{background:#29293a}
+.modal-card .muted{color:#aaa;font-size:13px}
+.account-status{font-size:12px;color:#c4b5fd}
 @media(min-width:800px){
   .sidebar{position:relative;transform:none}
   .main{width:calc(100% - 270px)}
@@ -57,19 +71,25 @@ button:disabled{opacity:.55;cursor:not-allowed}
 }
 </style>
 </head>
+
 <body>
 <div class="app">
+
 <aside class="sidebar" id="sidebar">
   <div class="brand">✦ Fuot IA</div>
+
   <button class="side-btn" id="newChat">＋ Nova conversa</button>
   <button class="side-btn" id="searchMode">⌕ Pesquisar na internet</button>
   <button class="side-btn" id="readMode">↗ Ler um link</button>
   <button class="side-btn" id="imageMode">✧ Gerar imagem</button>
+  <button class="side-btn" id="accountSideBtn">♙ Conta / Entrar</button>
+
   <div style="color:#aaa;font-size:13px;margin-top:12px">Conversas recentes</div>
   <div id="history"></div>
+
   <div class="side-bottom">
     <button class="side-btn" id="settingsBtn" style="width:100%">⚙ Configurações</button>
-    <p>Contato: <a href="mailto:contato.fuotia@outlook.com" style="color:#c4b5fd">contato.fuotia@outlook.com</a></p>
+    <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
     <p>Fuot IA · Acesso de visitante</p>
   </div>
 </aside>
@@ -81,13 +101,26 @@ button:disabled{opacity:.55;cursor:not-allowed}
   <button class="menu-btn" id="menuBtn">☰</button>
   <strong>Fuot IA</strong>
   <span class="spacer"></span>
-  <span class="status" id="status">Visitante</span>
+  <span class="account-status" id="status">Convidado</span>
+  <button class="tool" id="accountTopBtn">Entrar</button>
 </header>
 
 <section id="messages">
   <div class="welcome" id="welcome">
     <h1>Como posso ajudar?</h1>
     <p>Converse, programe, estude, envie imagens e áudios e explore suas ideias.</p>
+
+    <div class="welcome-actions">
+      <button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button>
+      <button class="secondary-btn" id="guestBtn">Continuar como convidado</button>
+    </div>
+
+    <div class="welcome-legal">
+      Ao utilizar a Fuot IA, você concorda com os
+      <a href="#" id="welcomeTerms">Termos de Uso</a> e a
+      <a href="#" id="welcomePrivacy">Política de Privacidade</a>.
+      <p>Contato: contato.fuotia@outlook.com</p>
+    </div>
   </div>
 </section>
 
@@ -130,8 +163,15 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
 <script>
 const API_URL="https://fuot-ia-api.ericksouzaneri8.workers.dev";
+
+// Configure estes dois valores depois de criar seu projeto Supabase.
+const SUPABASE_URL="COLE_AQUI_A_URL_DO_SEU_PROJETO";
+const SUPABASE_ANON_KEY="COLE_AQUI_A_CHAVE_PUBLICA_ANON";
+
 const $=id=>document.getElementById(id);
 
+let authClient=null;
+let currentUser=null;
 let humanApproved=false;
 let attachedImage=null;
 let attachedAudio=null;
@@ -141,21 +181,236 @@ let chunks=[];
 let conversation=[];
 let conversationId=Date.now();
 
+function initializeAuth(){
+  const configured=
+    SUPABASE_URL.startsWith("https://") &&
+    !SUPABASE_URL.includes("COLE_AQUI") &&
+    SUPABASE_ANON_KEY &&
+    !SUPABASE_ANON_KEY.includes("COLE_AQUI");
+
+  if(!configured||!window.supabase?.createClient){
+    return;
+  }
+
+  try{
+    authClient=window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+    authClient.auth.getSession().then(({data})=>{
+      currentUser=data?.session?.user||null;
+      updateAccountStatus();
+    });
+
+    authClient.auth.onAuthStateChange((_event,session)=>{
+      currentUser=session?.user||null;
+      updateAccountStatus();
+    });
+
+  }catch(error){
+    console.error("Erro ao configurar autenticação:",error);
+  }
+}
+
+function updateAccountStatus(){
+  if(currentUser){
+    $("status").textContent=currentUser.email||"Conta conectada";
+    $("accountTopBtn").textContent="Minha conta";
+  }else{
+    $("status").textContent="Convidado";
+    $("accountTopBtn").textContent="Entrar";
+  }
+}
+
+function setGuest(){
+  currentUser=null;
+  updateAccountStatus();
+  $("modal").classList.add("hidden");
+}
+
+function openAccount(){
+  $("modalContent").innerHTML=`
+    <h2>Bem-vindo à Fuot IA</h2>
+    <p>Entre na sua conta ou continue como convidado.</p>
+
+    <button class="wide" id="showRegister">Criar conta com e-mail</button>
+    <button class="wide secondary" id="showLogin">Entrar com e-mail</button>
+    <button class="wide secondary" id="googleLogin">Continuar com Google</button>
+    <button class="wide secondary" id="continueGuest">Continuar como convidado</button>
+
+    <p class="muted" id="authNotice">
+      O acesso de convidado está disponível. Para ativar e-mail e Google,
+      configure o projeto de autenticação Supabase neste código.
+    </p>
+  `;
+
+  $("modal").classList.remove("hidden");
+
+  $("showRegister").onclick=()=>showEmailForm("register");
+  $("showLogin").onclick=()=>showEmailForm("login");
+  $("googleLogin").onclick=googleLogin;
+  $("continueGuest").onclick=setGuest;
+}
+
+function showEmailForm(mode){
+  const registering=mode==="register";
+
+  $("modalContent").innerHTML=`
+    <h2>${registering?"Criar conta":"Entrar com e-mail"}</h2>
+
+    <label for="authEmail">E-mail</label>
+    <input id="authEmail" type="email" placeholder="seuemail@exemplo.com" autocomplete="email">
+
+    <label for="authPassword">Senha</label>
+    <input id="authPassword" type="password" placeholder="Sua senha" autocomplete="${registering?"new-password":"current-password"}">
+
+    <button class="wide" id="submitEmail">${registering?"Criar minha conta":"Entrar"}</button>
+    <button class="wide secondary" id="backAccount">Voltar</button>
+
+    <p class="muted" id="authNotice"></p>
+  `;
+
+  $("submitEmail").onclick=()=>emailAuth(mode);
+  $("backAccount").onclick=openAccount;
+}
+
+async function emailAuth(mode){
+  const email=$("authEmail").value.trim();
+  const password=$("authPassword").value;
+
+  if(!email||!password){
+    $("authNotice").textContent="Informe seu e-mail e sua senha.";
+    return;
+  }
+
+  if(password.length<6){
+    $("authNotice").textContent="A senha precisa ter pelo menos 6 caracteres.";
+    return;
+  }
+
+  if(!authClient){
+    $("authNotice").textContent=
+      "A autenticação ainda não foi configurada. Adicione a URL e a chave pública do Supabase no início do código.";
+    return;
+  }
+
+  $("submitEmail").disabled=true;
+  $("authNotice").textContent="Processando...";
+
+  try{
+    let result;
+
+    if(mode==="register"){
+      result=await authClient.auth.signUp({
+        email,
+        password
+      });
+    }else{
+      result=await authClient.auth.signInWithPassword({
+        email,
+        password
+      });
+    }
+
+    if(result.error)throw result.error;
+
+    if(mode==="register"&&!result.data.session){
+      $("authNotice").textContent=
+        "Cadastro realizado. Confira seu e-mail para confirmar a conta.";
+    }else{
+      currentUser=result.data.user;
+      updateAccountStatus();
+      $("modal").classList.add("hidden");
+    }
+
+  }catch(error){
+    $("authNotice").textContent=
+      error.message||"Não foi possível concluir a autenticação.";
+  }finally{
+    $("submitEmail").disabled=false;
+  }
+}
+
+async function googleLogin(){
+  if(!authClient){
+    $("authNotice").textContent=
+      "Configure primeiro o Supabase e o provedor Google para ativar esse acesso.";
+    return;
+  }
+
+  try{
+    const {error}=await authClient.auth.signInWithOAuth({
+      provider:"google",
+      options:{
+        redirectTo:window.location.origin
+      }
+    });
+
+    if(error)throw error;
+
+  }catch(error){
+    $("authNotice").textContent=
+      error.message||"Não foi possível entrar com Google.";
+  }
+}
+
+async function logout(){
+  if(authClient&&currentUser){
+    const {error}=await authClient.auth.signOut();
+
+    if(error){
+      alert(error.message);
+      return;
+    }
+  }
+
+  currentUser=null;
+  updateAccountStatus();
+  $("modal").classList.add("hidden");
+}
+
 function setHuman(value){
   humanApproved=Boolean(value);
+
+  try{
+    if(humanApproved){
+      sessionStorage.setItem("fuot_human_approved","true");
+    }
+  }catch(error){
+    console.warn("Não foi possível salvar a confirmação da sessão.");
+  }
 
   $("humanCheck").classList.toggle("approved",humanApproved);
   $("humanCheck").textContent=humanApproved?"✓":"";
   $("humanCheck").setAttribute("aria-pressed",String(humanApproved));
 
-  $("humanMessage").textContent=humanApproved
-    ?"Confirmação registrada. Você pode enviar sua solicitação."
-    :"Clique em Sou humano para liberar o envio.";
+  // Depois da confirmação, a área desaparece e não volta a cada mensagem.
+  $("humanArea").classList.toggle("hidden",humanApproved);
+  $("humanMessage").classList.toggle("hidden",humanApproved);
+
+  if(humanApproved){
+    $("humanMessage").textContent=
+      "Confirmação registrada nesta sessão.";
+  }
+}
+
+try{
+  humanApproved=sessionStorage.getItem("fuot_human_approved")==="true";
+}catch(error){
+  humanApproved=false;
+}
+
+function initializeHuman(){
+  if(humanApproved){
+    setHuman(true);
+  }
 }
 
 $("humanCheck").onclick=()=>{
-  if($("humanCheck").disabled)return;
-  setHuman(!humanApproved);
+  if(!humanApproved){
+    setHuman(true);
+  }
 };
 
 async function apiRequest(data){
@@ -212,7 +467,9 @@ function addMessage(role,text){
 }
 
 function showStatus(t){
-  $("status").textContent=t;
+  $("status").textContent=currentUser
+    ?(currentUser.email||"Conta conectada")
+    :t;
 }
 
 function setMode(m){
@@ -235,10 +492,26 @@ function newConversation(){
   conversationId=Date.now();
 
   $("messages").innerHTML=
-    '<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1><p>Converse, programe, estude, envie imagens e áudios e explore suas ideias.</p></div>';
+    '<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1><p>Converse, programe, estude, envie imagens e áudios e explore suas ideias.</p><div class="welcome-actions"><button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button><button class="secondary-btn" id="guestBtn">Continuar como convidado</button></div><div class="welcome-legal"><a href="#" id="welcomeTerms">Termos de Uso</a> · <a href="#" id="welcomePrivacy">Política de Privacidade</a><p>Contato: contato.fuotia@outlook.com</p></div></div>';
 
+  bindWelcomeButtons();
   setMode("chat");
   saveHistory();
+}
+
+function bindWelcomeButtons(){
+  $("welcomeAccount")?.addEventListener("click",openAccount);
+  $("guestBtn")?.addEventListener("click",setGuest);
+
+  $("welcomeTerms")?.addEventListener("click",e=>{
+    e.preventDefault();
+    legal(true);
+  });
+
+  $("welcomePrivacy")?.addEventListener("click",e=>{
+    e.preventDefault();
+    legal(false);
+  });
 }
 
 function saveHistory(){
@@ -376,269 +649,4 @@ $("audioInput").onchange=async e=>{
 $("recordBtn").onclick=async()=>{
   if(recorder&&recorder.state==="recording"){
     recorder.stop();
-    $("recordBtn").textContent="● Gravar";
-    return;
-  }
-
-  try{
-    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
-      throw Error("Seu navegador não oferece suporte à gravação de áudio.");
-    }
-
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-
-    recorder=new MediaRecorder(stream);
-    chunks=[];
-
-    recorder.ondataavailable=e=>{
-      if(e.data.size)chunks.push(e.data);
-    };
-
-    recorder.onstop=async()=>{
-      stream.getTracks().forEach(t=>t.stop());
-
-      const blob=new Blob(chunks,{
-        type:recorder.mimeType||"audio/webm"
-      });
-
-      if(blob.size>7*1024*1024){
-        alert("Gravação muito grande.");
-        return;
-      }
-
-      try{
-        attachedAudio=await fileData(blob);
-        attachedImage=null;
-        $("attachmentStatus").textContent="Gravação pronta para transcrição.";
-      }catch(e){
-        alert("Não foi possível preparar a gravação.");
-      }
-    };
-
-    recorder.start();
-    $("recordBtn").textContent="■ Parar";
-    $("attachmentStatus").textContent="Gravando... toque em Parar ao terminar.";
-
-  }catch(e){
-    alert(e.message||"Permita o acesso ao microfone nas configurações do navegador.");
-  }
-};
-
-async function send(){
-  const text=$("prompt").value.trim();
-  const image=attachedImage;
-  const audio=attachedAudio;
-  const mode=currentMode;
-
-  if(!text&&!image&&!audio)return;
-
-  if(!humanApproved){
-    $("humanMessage").textContent="Clique em Sou humano antes de enviar.";
-    $("humanCheck").focus();
-    return;
-  }
-
-  $("prompt").value="";
-  attachedImage=null;
-  attachedAudio=null;
-  $("attachmentStatus").textContent="";
-
-  const display=text||(image?"Analise esta imagem.":"Transcreva este áudio.");
-
-  addMessage(
-    "user",
-    display+
-    (image?" [Imagem anexada]":"")+
-    (audio?" [Áudio anexado]":"")
-  );
-
-  conversation.push({role:"user",content:display});
-
-  const waiting=addMessage("assistant","Preparando sua resposta...");
-
-  $("sendBtn").disabled=true;
-  $("humanCheck").disabled=true;
-  showStatus("Enviando...");
-
-  try{
-    let result;
-    let answer;
-
-    if(audio){
-      result=await apiRequest({
-        action:"transcribe",
-        audio
-      });
-
-      answer="**Transcrição do áudio:**\n\n"+(result.text||"Não foi possível transcrever.");
-
-    }else if(mode==="image"){
-      result=await apiRequest({
-        action:"generate_image",
-        prompt:text
-      });
-
-      if(!result.image){
-        throw Error("O servidor não retornou a imagem.");
-      }
-
-      const src=result.image.startsWith("data:")
-        ?result.image
-        :"data:image/png;base64,"+result.image;
-
-      waiting.innerHTML="<p>Imagem gerada:</p>";
-
-      const im=document.createElement("img");
-      im.src=src;
-      im.alt="Imagem gerada pela Fuot IA";
-      waiting.appendChild(im);
-
-      answer="Imagem gerada a partir de: "+text;
-
-    }else if(mode==="search"){
-      result=await apiRequest({
-        action:"search",
-        query:text
-      });
-
-      const follow=await apiRequest({
-        action:"chat",
-        message:"Responda à pergunta usando estes resultados. Não invente informações.\nPergunta: "+text+"\nResultados:\n"+result.text
-      });
-
-      answer=follow.text||result.text;
-
-    }else if(mode==="read"){
-      result=await apiRequest({
-        action:"read_url",
-        url:text
-      });
-
-      const follow=await apiRequest({
-        action:"chat",
-        message:"Explique e resuma o conteúdo desta página sem inventar informações:\n"+result.text
-      });
-
-      answer=follow.text;
-
-    }else{
-      result=await apiRequest({
-        action:"chat",
-        message:text,
-        image
-      });
-
-      answer=result.text||"Não recebi uma resposta.";
-    }
-
-    if(!(mode==="image"&&!audio)){
-      waiting.innerHTML=markdown(answer||"Não foi possível gerar resposta.");
-    }
-
-    conversation.push({
-      role:"assistant",
-      content:answer||"Imagem gerada."
-    });
-
-    saveHistory();
-    showStatus("Visitante");
-
-  }catch(e){
-    waiting.textContent="Não foi possível concluir: "+e.message;
-
-    // Mantém o anexo para que o usuário possa tentar novamente.
-    if(image)attachedImage=image;
-    if(audio)attachedAudio=audio;
-
-    $("attachmentStatus").textContent=
-      image?"Imagem mantida para nova tentativa.":
-      audio?"Áudio mantido para nova tentativa.":"";
-
-    showStatus("Erro");
-
-  }finally{
-    $("sendBtn").disabled=false;
-    $("humanCheck").disabled=false;
-    setHuman(false);
-  }
-}
-
-$("sendBtn").onclick=send;
-
-$("prompt").addEventListener("keydown",e=>{
-  if(e.key==="Enter"&&!e.shiftKey){
-    e.preventDefault();
-    send();
-  }
-});
-
-$("newChat").onclick=newConversation;
-$("searchMode").onclick=()=>setMode("search");
-$("readMode").onclick=()=>setMode("read");
-$("imageMode").onclick=()=>setMode("image");
-
-$("menuBtn").onclick=()=>{
-  $("sidebar").classList.add("open");
-  $("overlay").classList.add("show");
-};
-
-$("overlay").onclick=()=>{
-  $("sidebar").classList.remove("open");
-  $("overlay").classList.remove("show");
-};
-
-$("settingsBtn").onclick=()=>{
-  $("modalContent").innerHTML=`
-    <h2>Configurações</h2>
-    <p>Acesso de visitante. O histórico fica armazenado neste aparelho.</p>
-    <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
-    <p><a href="#" id="terms">Termos de Uso</a> · <a href="#" id="privacy">Política de Privacidade</a></p>
-  `;
-
-  $("modal").classList.remove("hidden");
-
-  $("terms").onclick=e=>{
-    e.preventDefault();
-    legal(true);
-  };
-
-  $("privacy").onclick=e=>{
-    e.preventDefault();
-    legal(false);
-  };
-};
-
-function legal(isTerms){
-  $("modalContent").innerHTML=isTerms
-  ?`
-    <h2>Termos de Uso — Fuot IA</h2>
-    <p>Ao utilizar a Fuot IA, você concorda em utilizar a plataforma de maneira legal, responsável e respeitosa.</p>
-    <p>A Fuot IA oferece respostas geradas por inteligência artificial. Essas respostas podem conter erros, imprecisões ou informações desatualizadas. Confira informações importantes antes de utilizá-las para tomar decisões.</p>
-    <p>Não utilize a plataforma para atividades ilegais, fraudes, ameaças, violação de direitos ou ações que possam prejudicar outras pessoas.</p>
-    <p>O serviço pode passar por atualizações, períodos de indisponibilidade ou alterações de funcionamento.</p>
-    <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
-  `
-  :`
-    <h2>Política de Privacidade — Fuot IA</h2>
-    <p>As mensagens e os arquivos enviados são transmitidos ao servidor da Fuot IA hospedado na Cloudflare e processados pelos serviços de inteligência artificial utilizados pela plataforma.</p>
-    <p>O histórico desta versão é armazenado localmente no navegador do usuário. Limpar os dados do navegador pode apagar esse histórico.</p>
-    <p>Os arquivos enviados, como imagens e áudios, são encaminhados ao servidor para realizar as funções solicitadas.</p>
-    <p>A plataforma utiliza informações técnicas da solicitação, como o endereço IP, para aplicar limites de uso e reduzir spam e excesso de solicitações.</p>
-    <p>Evite enviar senhas, dados bancários ou informações pessoais confidenciais.</p>
-    <p>Para dúvidas ou solicitações relacionadas à privacidade, entre em contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a>.</p>
-    <p><strong>Atenção:</strong> este texto é uma versão inicial e deve ser revisado para refletir todos os serviços, fornecedores e práticas efetivamente utilizados antes do lançamento público.</p>
-  `;
-}
-
-$("closeModal").onclick=()=>$("modal").classList.add("hidden");
-
-$("modal").onclick=e=>{
-  if(e.target===$("modal")){
-    $("modal").classList.add("hidden");
-  }
-};
-
-renderHistory();
-</script>
-</body>
-      </html>
+    $("recordBtn").
