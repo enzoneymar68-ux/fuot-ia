@@ -17,33 +17,96 @@ main{flex:1;padding:20px 0;display:flex;flex-direction:column;gap:14px}
 .welcome{padding:20px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,#172943,#101a2b)}
 .welcome h2{margin:0 0 8px;font-size:22px}.welcome p{margin:0;color:var(--muted);line-height:1.5}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.chip{border:1px solid #35527a;background:#182b46;color:#cfe2ff;padding:8px 11px;border-radius:999px;font-size:13px}
-.notice{border:1px solid #6d5527;background:#302817;color:#f3dba5;border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.45}
+.notice{border:1px solid #28583d;background:#142b20;color:#b9efce;border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.45}
 #messages{display:flex;flex-direction:column;gap:12px}.msg{max-width:92%;padding:13px 15px;border-radius:16px;white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere}.user{align-self:flex-end;background:#244c80}.bot{align-self:flex-start;background:#17263b;border:1px solid var(--line)}.bot small{display:block;color:#a9c9f5;margin-bottom:5px;font-weight:700}
 .composer{position:sticky;bottom:0;background:#0b1220;padding:12px 0 max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line)}
 select,textarea,button{font:inherit}select{width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);background:#121d30;color:var(--text);margin-bottom:9px}
-.entry{display:flex;gap:8px}textarea{flex:1;min-height:50px;max-height:130px;resize:vertical;padding:13px;border-radius:14px;border:1px solid var(--line);background:#121d30;color:var(--text)}button{border:0;border-radius:14px;background:var(--blue);color:white;padding:0 18px;font-weight:700}
+.entry{display:flex;gap:8px}textarea{flex:1;min-height:50px;max-height:130px;resize:vertical;padding:13px;border-radius:14px;border:1px solid var(--line);background:#121d30;color:var(--text)}button{border:0;border-radius:14px;background:var(--blue);color:white;padding:0 18px;font-weight:700}button:disabled,textarea:disabled{opacity:.6}
 .foot{text-align:center;color:#71839d;font-size:11px;padding:8px}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div class="logo">F</div><div><h1>Fuot IA</h1><p>ASSISTENTE DE PROGRAMAÇÃO</p></div><div class="status">● Protótipo</div></header>
+<header><div class="logo">F</div><div><h1>Fuot IA</h1><p>ASSISTENTE DE PROGRAMAÇÃO</p></div><div class="status">● Conectável</div></header>
 <main>
 <section class="welcome"><h2>Olá! Eu sou a Fuot IA.</h2><p>Seu espaço para criar, entender e corrigir códigos. Vamos começar por Lua e Luau.</p><div class="chips"><button class="chip" onclick="quick('Explique como funciona uma variável em Lua.')">Aprender Lua</button><button class="chip" onclick="quick('Crie um script Lua simples e explique cada linha.')">Criar script</button><button class="chip" onclick="quick('Como encontro e corrijo erros em um script Lua?')">Corrigir erros</button></div></section>
-<div class="notice"><b>Modo demonstração:</b> esta primeira versão é a interface. Ela ainda não está conectada a um modelo de IA; não envia mensagens para nenhum serviço.</div>
-<div id="messages"><div class="msg bot"><small>Fuot IA · demonstração</small>Escolha uma linguagem e envie uma pergunta. Esta versão testa a interface; a conexão com o cérebro de IA será a próxima etapa.</div></div>
+<div class="notice"><b>Conexão configurada:</b> as mensagens serão enviadas ao servidor da Fuot IA na Cloudflare para gerar respostas.</div>
+<div id="messages"><div class="msg bot"><small>Fuot IA</small>Olá! Pode enviar sua pergunta sobre programação. Meu foco principal é Lua e Luau.</div></div>
 </main>
 <div class="composer">
 <select id="language" aria-label="Linguagem"><option>Lua</option><option>Luau (Roblox)</option><option>Python</option><option>JavaScript</option><option>Outra linguagem</option></select>
-<div class="entry"><textarea id="prompt" placeholder="Peça um código ou tire uma dúvida..." rows="2"></textarea><button onclick="send()">Enviar</button></div>
-<div class="foot">Fuot IA · Protótipo inicial · Suas mensagens ficam apenas nesta tela</div>
+<div class="entry"><textarea id="prompt" placeholder="Peça um código ou tire uma dúvida..." rows="2"></textarea><button id="sendButton" onclick="send()">Enviar</button></div>
+<div class="foot">Fuot IA · Primeira versão conectada</div>
 </div>
 </div>
 <script>
-const messages=document.getElementById('messages'),input=document.getElementById('prompt');
-function quick(t){input.value=t;input.focus()}
-function send(){const t=input.value.trim();if(!t)return;const u=document.createElement('div');u.className='msg user';u.textContent=t;messages.appendChild(u);const b=document.createElement('div');b.className='msg bot';const s=document.createElement('small');s.textContent='Fuot IA · demonstração';b.appendChild(s);b.append('Recebi sua pergunta sobre '+document.getElementById('language').value+'. A interface está funcionando, mas ainda preciso conectar um modelo de IA para gerar uma resposta real.');messages.appendChild(b);input.value='';messages.scrollIntoView({behavior:'smooth',block:'end'})}
-input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+const messages = document.getElementById('messages');
+const input = document.getElementById('prompt');
+const sendButton = document.getElementById('sendButton');
+
+const API_URL = 'https://fuot-ia-api.ericksouzaneri8.workers.dev';
+
+function quick(t) {
+  input.value = t;
+  input.focus();
+}
+
+async function send() {
+  const t = input.value.trim();
+  if (!t || sendButton.disabled) return;
+
+  const language = document.getElementById('language').value;
+
+  const u = document.createElement('div');
+  u.className = 'msg user';
+  u.textContent = t;
+  messages.appendChild(u);
+
+  const b = document.createElement('div');
+  b.className = 'msg bot';
+  const s = document.createElement('small');
+  s.textContent = 'Fuot IA';
+  b.appendChild(s);
+
+  const answer = document.createElement('div');
+  answer.textContent = 'Pensando...';
+  b.appendChild(answer);
+  messages.appendChild(b);
+
+  input.value = '';
+  input.disabled = true;
+  sendButton.disabled = true;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: t, language })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Erro ao consultar a IA.');
+    }
+
+    answer.textContent = data.answer || 'Não recebi uma resposta.';
+  } catch (error) {
+    answer.textContent = 'Não consegui conectar à Fuot IA. Verifique sua conexão e tente novamente.';
+  } finally {
+    input.disabled = false;
+    sendButton.disabled = false;
+    input.focus();
+    messages.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+}
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
 </script>
 </body>
 </html>
