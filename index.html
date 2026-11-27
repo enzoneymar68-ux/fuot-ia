@@ -108,7 +108,7 @@ a{color:#c4b5fd}
 <section id="messages">
   <div class="welcome" id="welcome">
     <h1>Como posso ajudar?</h1>
-    <p>Converse, programe, estude, envie imagens e áudios e explore suas ideias.</p>
+    <p>Converse, programe, estude, envie imagens e áudios e explore suas ideias. Como visitante, suas conversas não serão salvas.</p>
 
     <div class="welcome-actions">
       <button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button>
@@ -172,6 +172,7 @@ const $=id=>document.getElementById(id);
 
 let authClient=null;
 let currentUser=null;
+let guestMode=true;
 let humanApproved=false;
 let attachedImage=null;
 let attachedAudio=null;
@@ -201,11 +202,13 @@ function initializeAuth(){
     authClient.auth.getSession().then(({data})=>{
       currentUser=data?.session?.user||null;
       updateAccountStatus();
+      renderHistory();
     });
 
     authClient.auth.onAuthStateChange((_event,session)=>{
       currentUser=session?.user||null;
       updateAccountStatus();
+      renderHistory();
     });
 
   }catch(error){
@@ -214,6 +217,7 @@ function initializeAuth(){
 }
 
 function updateAccountStatus(){
+  guestMode=!currentUser;
   if(currentUser){
     $("status").textContent=currentUser.email||"Conta conectada";
     $("accountTopBtn").textContent="Minha conta";
@@ -223,10 +227,20 @@ function updateAccountStatus(){
   }
 }
 
-function setGuest(){
+async function setGuest(){
+  if(authClient&&currentUser){
+    try{await authClient.auth.signOut();}catch(error){console.warn("Não foi possível encerrar a sessão:",error);}
+  }
   currentUser=null;
+  guestMode=true;
+  conversation=[];
+  conversationId=Date.now();
+  $("messages").innerHTML='<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1><p>Você está usando a Fuot IA como visitante. Suas conversas não serão salvas.</p><div class="welcome-actions"><button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button><button class="secondary-btn" id="guestBtn">Continuar como convidado</button></div><div class="welcome-legal"><a href="#" id="welcomeTerms">Termos de Uso</a> · <a href="#" id="welcomePrivacy">Política de Privacidade</a></div></div>';
+  bindWelcomeButtons();
   updateAccountStatus();
+  renderHistory();
   $("modal").classList.add("hidden");
+  setMode("chat");
 }
 
 function openAccount(){
@@ -366,7 +380,9 @@ async function logout(){
   }
 
   currentUser=null;
+  guestMode=true;
   updateAccountStatus();
+  renderHistory();
   $("modal").classList.add("hidden");
 }
 
@@ -515,6 +531,10 @@ function bindWelcomeButtons(){
 }
 
 function saveHistory(){
+  if(guestMode||!currentUser){
+    renderHistory();
+    return;
+  }
   try{
     const all=JSON.parse(localStorage.getItem("fuot_history")||"[]")
       .filter(x=>x.id!==conversationId);
@@ -536,6 +556,7 @@ function saveHistory(){
 
 function renderHistory(){
   $("history").innerHTML="";
+  if(guestMode||!currentUser)return;
 
   try{
     JSON.parse(localStorage.getItem("fuot_history")||"[]").forEach(item=>{
@@ -863,7 +884,7 @@ $("overlay").onclick=()=>{
 $("settingsBtn").onclick=()=>{
   $("modalContent").innerHTML=`
     <h2>Configurações</h2>
-    <p>Acesso de visitante. O histórico fica armazenado neste aparelho.</p>
+    <p>Visitantes não têm conversas salvas. Ao entrar em uma conta, o histórico desta versão fica armazenado neste aparelho; a sincronização entre dispositivos será ativada em uma próxima etapa.</p>
     <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
     <p><a href="#" id="terms">Termos de Uso</a> · <a href="#" id="privacy">Política de Privacidade</a></p>
   `;
@@ -911,6 +932,10 @@ $("modal").onclick=e=>{
   }
 };
 
+bindWelcomeButtons();
+$("welcomeAccount")?.addEventListener("click",openAccount);
+$("accountTopBtn").onclick=openAccount;
+$("accountSideBtn").onclick=openAccount;
 renderHistory();
 </script>
 </body>
