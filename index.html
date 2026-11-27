@@ -180,7 +180,10 @@ let currentMode="chat";
 let recorder=null;
 let chunks=[];
 let conversation=[];
-let conversationId=Date.now();
+function makeConversationId(){
+  return window.crypto?.randomUUID?.()||("fuot-"+Date.now()+"-"+Math.random().toString(36).slice(2));
+}
+let conversationId=makeConversationId();
 
 function initializeAuth(){
   const configured=
@@ -234,7 +237,7 @@ async function setGuest(){
   currentUser=null;
   guestMode=true;
   conversation=[];
-  conversationId=Date.now();
+  conversationId=makeConversationId();
   $("messages").innerHTML='<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1><p>Você está usando a Fuot IA como visitante. Suas conversas não serão salvas.</p><div class="welcome-actions"><button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button><button class="secondary-btn" id="guestBtn">Continuar como convidado</button></div><div class="welcome-legal"><a href="#" id="welcomeTerms">Termos de Uso</a> · <a href="#" id="welcomePrivacy">Política de Privacidade</a></div></div>';
   bindWelcomeButtons();
   updateAccountStatus();
@@ -530,58 +533,66 @@ function bindWelcomeButtons(){
   });
 }
 
-function saveHistory(){
-  if(guestMode||!currentUser){
+async function saveHistory(){
+  if(guestMode||!currentUser||!authClient){
     renderHistory();
     return;
   }
+
+  const row={
+    id:String(conversationId),
+    user_id:currentUser.id,
+    title:(conversation.find(x=>x.role==="user")?.content||"Nova conversa").slice(0,80),
+    messages:conversation,
+    updated_at:new Date().toISOString()
+  };
+
   try{
-    const all=JSON.parse(localStorage.getItem("fuot_history")||"[]")
-      .filter(x=>x.id!==conversationId);
-
-    if(conversation.length){
-      all.unshift({
-        id:conversationId,
-        title:(conversation.find(x=>x.role==="user")?.content||"Nova conversa").slice(0,60),
-        messages:conversation
-      });
-    }
-
-    localStorage.setItem("fuot_history",JSON.stringify(all.slice(0,40)));
-    renderHistory();
-  }catch(e){
-    console.error("Erro ao salvar histórico:",e);
+    const {error}=await authClient
+      .from("conversations")
+      .upsert(row,{onConflict:"id"});
+    if(error)throw error;
+    await renderHistory();
+  }catch(error){
+    console.error("Não foi possível sincronizar o histórico:",error);
+    showStatus("Falha ao salvar histórico");
   }
 }
 
-function renderHistory(){
+async function renderHistory(){
   $("history").innerHTML="";
-  if(guestMode||!currentUser)return;
+  if(guestMode||!currentUser||!authClient)return;
 
   try{
-    JSON.parse(localStorage.getItem("fuot_history")||"[]").forEach(item=>{
+    const {data,error}=await authClient
+      .from("conversations")
+      .select("id,title,messages,updated_at")
+      .eq("user_id",currentUser.id)
+      .order("updated_at",{ascending:false})
+      .limit(40);
+
+    if(error)throw error;
+
+    (data||[]).forEach(item=>{
       const b=document.createElement("button");
       b.className="side-btn";
       b.textContent=item.title||"Conversa";
-
       b.onclick=()=>{
         conversationId=item.id;
-        conversation=item.messages||[];
+        conversation=Array.isArray(item.messages)?item.messages:[];
         $("messages").innerHTML="";
-
         if(!conversation.length){
           $("messages").innerHTML='<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1></div>';
         }else{
           conversation.forEach(m=>addMessage(m.role,m.content));
         }
-
         setMode("chat");
       };
-
       $("history").appendChild(b);
     });
-  }catch(e){
-    console.error("Erro ao carregar histórico:",e);
+  }catch(error){
+    console.error("Erro ao carregar histórico da conta:",error);
+    $("history").innerHTML='<div class="muted">Não foi possível carregar o histórico. Verifique a configuração do banco.</div>';
   }
 }
 
