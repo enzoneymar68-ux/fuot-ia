@@ -508,7 +508,7 @@ function setMode(m){
 
 function newConversation(){
   conversation=[];
-  conversationId=Date.now();
+  conversationId=makeConversationId();
 
   $("messages").innerHTML=
     '<div class="welcome" id="welcome"><h1>Como posso ajudar?</h1><p>Converse, programe, estude, envie imagens e áudios e explore suas ideias.</p><div class="welcome-actions"><button class="primary-btn" id="welcomeAccount">Criar conta / Entrar</button><button class="secondary-btn" id="guestBtn">Continuar como convidado</button></div><div class="welcome-legal"><a href="#" id="welcomeTerms">Termos de Uso</a> · <a href="#" id="welcomePrivacy">Política de Privacidade</a><p>Contato: contato.fuotia@outlook.com</p></div></div>';
@@ -805,26 +805,14 @@ async function send(){
         action:"search",
         query:text
       });
-
-      const follow=await apiRequest({
-        action:"chat",
-        message:"Responda à pergunta usando estes resultados. Não invente informações.\nPergunta: "+text+"\nResultados:\n"+result.text
-      });
-
-      answer=follow.text||result.text;
+      answer=result.text||"Não encontrei resultados suficientes.";
 
     }else if(mode==="read"){
       result=await apiRequest({
         action:"read_url",
         url:text
       });
-
-      const follow=await apiRequest({
-        action:"chat",
-        message:"Explique e resuma o conteúdo desta página sem inventar informações:\n"+result.text
-      });
-
-      answer=follow.text;
+      answer=result.text||"Não foi possível resumir esta página.";
 
     }else{
       result=await apiRequest({
@@ -846,7 +834,7 @@ async function send(){
     });
 
     saveHistory();
-    showStatus("Visitante");
+    showStatus("Pronto");
 
   }catch(e){
     waiting.textContent="Não foi possível concluir: "+e.message;
