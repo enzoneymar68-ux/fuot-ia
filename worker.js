@@ -240,6 +240,7 @@ export default {
           ],
           max_tokens: 1200,
           temperature: 0.6,
+          chat_template_kwargs: { enable_thinking: false },
           stream: true
         });
 
