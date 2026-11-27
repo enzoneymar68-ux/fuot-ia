@@ -231,8 +231,25 @@ export default {
       if (data.action === "chat" && !data.image) {
         const message = String(data.message || "").trim();
         if (!message) throw makeError("Escreva uma mensagem.");
-        const text = await askAI(env, message.slice(0, 16_000), null);
-        return json({ text }, 200, origin);
+        if (!env.AI) throw makeError("A conexão Workers AI não está configurada.", 503);
+        const stream = await env.AI.run(MODEL, {
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: message.slice(0, 16_000) }
+          ],
+          max_tokens: 800,
+          temperature: 0.5,
+          stream: true
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: {
+            ...corsHeaders(origin),
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no"
+          }
+        });
       }
 
       const result = await handleAction(data, env);
