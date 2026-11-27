@@ -228,6 +228,32 @@ export default {
       if (raw.length > MAX_BODY_SIZE) throw makeError("Solicitação muito grande.", 413);
       let data;
       try { data = JSON.parse(raw); } catch { throw makeError("Formato de solicitação inválido."); }
+      if (data.action === "chat" && !data.image) {
+        const message = String(data.message || "").trim();
+        if (!message) throw makeError("Escreva uma mensagem.");
+        if (!env.AI) throw makeError("A conexão Workers AI (binding AI) não está configurada.", 503);
+
+        const stream = await env.AI.run(MODEL, {
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: message.slice(0, 16_000) }
+          ],
+          max_tokens: 1200,
+          temperature: 0.6,
+          stream: true
+        });
+
+        return new Response(stream, {
+          status: 200,
+          headers: {
+            ...corsHeaders(origin),
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no"
+          }
+        });
+      }
+
       const result = await handleAction(data, env);
       return json(result, 200, origin);
     } catch (error) {
