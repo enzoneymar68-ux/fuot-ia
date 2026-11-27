@@ -485,20 +485,24 @@ async function apiStreamRequest(data,onText){
   let fullText="";
 
   function consumeLine(line){
-    if(!line.startsWith("data:"))return;
-    const payload=line.slice(5).trim();
+    const clean=line.trim();
+    if(!clean||clean.startsWith(":"))return;
+    const payload=clean.startsWith("data:")?clean.slice(5).trim():clean;
     if(!payload||payload==="[DONE]")return;
     try{
       const part=JSON.parse(payload);
-      const token=part.response||
-        part.choices?.[0]?.delta?.content||
-        part.result?.response||
-        "";
-      if(token){
+      const delta=part.choices?.[0]?.delta;
+      let token=part.response??part.result?.response??delta?.content??part.text??"";
+      if(Array.isArray(token)){
+        token=token.map(item=>typeof item==="string"?item:(item?.text||"")).join("");
+      }
+      if(typeof token==="string"&&token){
         fullText+=token;
         onText(fullText);
       }
-    }catch(error){}
+    }catch(error){
+      // Ignora metadados e linhas que não sejam eventos JSON de texto.
+    }
   }
 
   while(true){
@@ -511,7 +515,16 @@ async function apiStreamRequest(data,onText){
   }
   buffer+=decoder.decode();
   if(buffer.trim())consumeLine(buffer.trim());
-  if(!fullText)throw new Error("O modelo não retornou texto. Tente novamente.");
+  if(!fullText){
+    // Se o provedor alterar o formato do fluxo, tenta a resposta JSON tradicional.
+    const fallback=await apiRequest(data);
+    const fallbackText=fallback?.text||fallback?.response||"";
+    if(fallbackText){
+      onText(fallbackText);
+      return {text:fallbackText};
+    }
+    throw new Error("O modelo não retornou texto. Tente novamente.");
+  }
   return {text:fullText};
 }
 
