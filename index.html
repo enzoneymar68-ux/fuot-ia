@@ -391,28 +391,28 @@ function setHuman(value){
 
   try{
     if(humanApproved){
-      sessionStorage.setItem("fuot_human_approved","true");
+      // A confirmação fica salva neste aparelho e não é solicitada novamente.
+      localStorage.setItem("fuot_human_approved","true");
+    }else{
+      localStorage.removeItem("fuot_human_approved");
     }
   }catch(error){
-    console.warn("Não foi possível salvar a confirmação da sessão.");
+    console.warn("Não foi possível salvar a confirmação neste aparelho.");
   }
 
   $("humanCheck").classList.toggle("approved",humanApproved);
   $("humanCheck").textContent=humanApproved?"✓":"";
   $("humanCheck").setAttribute("aria-pressed",String(humanApproved));
-
-  // Depois da confirmação, a área desaparece e não volta a cada mensagem.
   $("humanArea").classList.toggle("hidden",humanApproved);
   $("humanMessage").classList.toggle("hidden",humanApproved);
-
   if(humanApproved){
-    $("humanMessage").textContent=
-      "Confirmação registrada nesta sessão.";
+    $("humanMessage").textContent="Confirmação registrada neste aparelho.";
   }
 }
 
 try{
-  humanApproved=sessionStorage.getItem("fuot_human_approved")==="true";
+  humanApproved=localStorage.getItem("fuot_human_approved")==="true" ||
+    sessionStorage.getItem("fuot_human_approved")==="true";
 }catch(error){
   humanApproved=false;
 }
@@ -853,7 +853,7 @@ async function send(){
   }finally{
     $("sendBtn").disabled=false;
     $("humanCheck").disabled=false;
-    setHuman(false);
+    // A confirmação é permanente neste aparelho; não solicitar novamente.
   }
 }
 
@@ -933,6 +933,7 @@ $("modal").onclick=e=>{
 };
 
 initializeAuth();
+initializeHuman();
 bindWelcomeButtons();
 $("accountTopBtn").onclick=openAccount;
 $("accountSideBtn").onclick=openAccount;
