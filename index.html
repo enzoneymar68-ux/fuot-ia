@@ -895,7 +895,7 @@ $("overlay").onclick=()=>{
 $("settingsBtn").onclick=()=>{
   $("modalContent").innerHTML=`
     <h2>Configurações</h2>
-    <p>Visitantes não têm conversas salvas. Ao entrar em uma conta, o histórico desta versão fica armazenado neste aparelho; a sincronização entre dispositivos será ativada em uma próxima etapa.</p>
+    <p>Visitantes não têm conversas salvas. Ao entrar em uma conta com a sincronização configurada, o histórico pode ser armazenado na sua conta e acessado em outros dispositivos.</p>
     <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
     <p><a href="#" id="terms">Termos de Uso</a> · <a href="#" id="privacy">Política de Privacidade</a></p>
   `;
@@ -925,13 +925,14 @@ function legal(isTerms){
   `
   :`
     <h2>Política de Privacidade — Fuot IA</h2>
-    <p>As mensagens e os arquivos enviados são transmitidos ao servidor da Fuot IA hospedado na Cloudflare e processados pelos serviços de inteligência artificial utilizados pela plataforma.</p>
-    <p>O histórico desta versão é armazenado localmente no navegador do usuário. Limpar os dados do navegador pode apagar esse histórico.</p>
-    <p>Os arquivos enviados, como imagens e áudios, são encaminhados ao servidor para realizar as funções solicitadas.</p>
-    <p>A plataforma utiliza informações técnicas da solicitação, como o endereço IP, para aplicar limites de uso e reduzir spam e excesso de solicitações.</p>
-    <p>Evite enviar senhas, dados bancários ou informações pessoais confidenciais.</p>
+    <p>As mensagens e os arquivos enviados são transmitidos pela internet e processados pela infraestrutura técnica e pelos serviços de inteligência artificial necessários para fornecer as funções da Fuot IA.</p>
+    <p>Quando você utiliza recursos como conversa, pesquisa, leitura de links, análise de imagens ou transcrição de áudio, os dados necessários para atender à solicitação podem ser enviados aos respectivos provedores de tecnologia.</p>
+    <p>Quando você entra em uma conta, o histórico de conversas pode ser armazenado no banco de dados associado à sua conta para permitir a sincronização. Visitantes não têm suas conversas gravadas no histórico da conta.</p>
+    <p>Arquivos enviados, como imagens e áudios, são processados para executar a função solicitada. Não envie senhas, dados bancários ou informações pessoais confidenciais.</p>
+    <p>Informações técnicas, como endereço IP, podem ser tratadas para funcionamento, segurança, prevenção de abuso e aplicação de limites de uso.</p>
+    <p>Alguns dados podem ser tratados por fornecedores de infraestrutura e inteligência artificial envolvidos na operação da plataforma. As práticas e os fornecedores efetivamente utilizados devem ser identificados e mantidos atualizados nesta política antes da disponibilização pública.</p>
     <p>Para dúvidas ou solicitações relacionadas à privacidade, entre em contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a>.</p>
-    <p><strong>Atenção:</strong> este texto é uma versão inicial e deve ser revisado para refletir todos os serviços, fornecedores e práticas efetivamente utilizados antes do lançamento público.</p>
+    <p><strong>Atenção:</strong> esta é uma versão inicial. A política deve ser revisada para refletir os fornecedores, os prazos de retenção, as bases legais e os direitos dos titulares aplicáveis.</p>
   `;
 }
 
