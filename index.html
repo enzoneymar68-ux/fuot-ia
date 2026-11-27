@@ -466,7 +466,7 @@ async function apiStreamRequest(data,onText){
     response=await fetch(API_URL,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(data}
+      body:JSON.stringify(data)
     });
   }catch(error){
     throw new Error("Não foi possível conectar ao servidor da Fuot IA. Verifique sua internet.");
@@ -505,7 +505,7 @@ async function apiStreamRequest(data,onText){
     const {value,done}=await reader.read();
     if(done)break;
     buffer+=decoder.decode(value,{stream:true});
-    const lines=buffer.split(/\\r?\\n/);
+    const lines=buffer.split(/\r?\n/);
     buffer=lines.pop()||"";
     lines.forEach(consumeLine);
   }
