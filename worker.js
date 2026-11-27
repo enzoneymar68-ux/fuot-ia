@@ -1,4 +1,4 @@
-const MODEL = "@cf/zai-org/glm-4.7-flash";
+const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const VISION = "@cf/meta/llama-3.2-11b-vision-instruct";
 const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const AUDIO_MODEL = "@cf/openai/whisper-large-v3-turbo";
@@ -153,7 +153,7 @@ async function askAI(env, message, image) {
     return outputText(result) || "Não consegui analisar essa imagem.";
   }
   messages.push({ role: "user", content: message });
-  const result = await env.AI.run(MODEL, { messages, max_tokens: 1200, temperature: 0.6 });
+  const result = await env.AI.run(MODEL, { messages, max_tokens: 800, temperature: 0.5 });
   return outputText(result) || "Não consegui gerar uma resposta.";
 }
 
