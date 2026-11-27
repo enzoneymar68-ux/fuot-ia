@@ -649,4 +649,269 @@ $("audioInput").onchange=async e=>{
 $("recordBtn").onclick=async()=>{
   if(recorder&&recorder.state==="recording"){
     recorder.stop();
-    $("recordBtn").
+    $("recordBtn").textContent="● Gravar";
+    return;
+  }
+
+  try{
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
+      throw Error("Seu navegador não oferece suporte à gravação de áudio.");
+    }
+
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+
+    recorder=new MediaRecorder(stream);
+    chunks=[];
+
+    recorder.ondataavailable=e=>{
+      if(e.data.size)chunks.push(e.data);
+    };
+
+    recorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+
+      const blob=new Blob(chunks,{
+        type:recorder.mimeType||"audio/webm"
+      });
+
+      if(blob.size>7*1024*1024){
+        alert("Gravação muito grande.");
+        return;
+      }
+
+      try{
+        attachedAudio=await fileData(blob);
+        attachedImage=null;
+        $("attachmentStatus").textContent="Gravação pronta para transcrição.";
+      }catch(e){
+        alert("Não foi possível preparar a gravação.");
+      }
+    };
+
+    recorder.start();
+    $("recordBtn").textContent="■ Parar";
+    $("attachmentStatus").textContent="Gravando... toque em Parar ao terminar.";
+
+  }catch(e){
+    alert(e.message||"Permita o acesso ao microfone nas configurações do navegador.");
+  }
+};
+
+async function send(){
+  const text=$("prompt").value.trim();
+  const image=attachedImage;
+  const audio=attachedAudio;
+  const mode=currentMode;
+
+  if(!text&&!image&&!audio)return;
+
+  if(!humanApproved){
+    $("humanMessage").textContent="Clique em Sou humano antes de enviar.";
+    $("humanCheck").focus();
+    return;
+  }
+
+  $("prompt").value="";
+  attachedImage=null;
+  attachedAudio=null;
+  $("attachmentStatus").textContent="";
+
+  const display=text||(image?"Analise esta imagem.":"Transcreva este áudio.");
+
+  addMessage(
+    "user",
+    display+
+    (image?" [Imagem anexada]":"")+
+    (audio?" [Áudio anexado]":"")
+  );
+
+  conversation.push({role:"user",content:display});
+
+  const waiting=addMessage("assistant","Preparando sua resposta...");
+
+  $("sendBtn").disabled=true;
+  $("humanCheck").disabled=true;
+  showStatus("Enviando...");
+
+  try{
+    let result;
+    let answer;
+
+    if(audio){
+      result=await apiRequest({
+        action:"transcribe",
+        audio
+      });
+
+      answer="**Transcrição do áudio:**\n\n"+(result.text||"Não foi possível transcrever.");
+
+    }else if(mode==="image"){
+      result=await apiRequest({
+        action:"generate_image",
+        prompt:text
+      });
+
+      if(!result.image){
+        throw Error("O servidor não retornou a imagem.");
+      }
+
+      const src=result.image.startsWith("data:")
+        ?result.image
+        :"data:image/png;base64,"+result.image;
+
+      waiting.innerHTML="<p>Imagem gerada:</p>";
+
+      const im=document.createElement("img");
+      im.src=src;
+      im.alt="Imagem gerada pela Fuot IA";
+      waiting.appendChild(im);
+
+      answer="Imagem gerada a partir de: "+text;
+
+    }else if(mode==="search"){
+      result=await apiRequest({
+        action:"search",
+        query:text
+      });
+
+      const follow=await apiRequest({
+        action:"chat",
+        message:"Responda à pergunta usando estes resultados. Não invente informações.\nPergunta: "+text+"\nResultados:\n"+result.text
+      });
+
+      answer=follow.text||result.text;
+
+    }else if(mode==="read"){
+      result=await apiRequest({
+        action:"read_url",
+        url:text
+      });
+
+      const follow=await apiRequest({
+        action:"chat",
+        message:"Explique e resuma o conteúdo desta página sem inventar informações:\n"+result.text
+      });
+
+      answer=follow.text;
+
+    }else{
+      result=await apiRequest({
+        action:"chat",
+        message:text,
+        image
+      });
+
+      answer=result.text||"Não recebi uma resposta.";
+    }
+
+    if(!(mode==="image"&&!audio)){
+      waiting.innerHTML=markdown(answer||"Não foi possível gerar resposta.");
+    }
+
+    conversation.push({
+      role:"assistant",
+      content:answer||"Imagem gerada."
+    });
+
+    saveHistory();
+    showStatus("Visitante");
+
+  }catch(e){
+    waiting.textContent="Não foi possível concluir: "+e.message;
+
+    // Mantém o anexo para que o usuário possa tentar novamente.
+    if(image)attachedImage=image;
+    if(audio)attachedAudio=audio;
+
+    $("attachmentStatus").textContent=
+      image?"Imagem mantida para nova tentativa.":
+      audio?"Áudio mantido para nova tentativa.":"";
+
+    showStatus("Erro");
+
+  }finally{
+    $("sendBtn").disabled=false;
+    $("humanCheck").disabled=false;
+    setHuman(false);
+  }
+}
+
+$("sendBtn").onclick=send;
+
+$("prompt").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    send();
+  }
+});
+
+$("newChat").onclick=newConversation;
+$("searchMode").onclick=()=>setMode("search");
+$("readMode").onclick=()=>setMode("read");
+$("imageMode").onclick=()=>setMode("image");
+
+$("menuBtn").onclick=()=>{
+  $("sidebar").classList.add("open");
+  $("overlay").classList.add("show");
+};
+
+$("overlay").onclick=()=>{
+  $("sidebar").classList.remove("open");
+  $("overlay").classList.remove("show");
+};
+
+$("settingsBtn").onclick=()=>{
+  $("modalContent").innerHTML=`
+    <h2>Configurações</h2>
+    <p>Acesso de visitante. O histórico fica armazenado neste aparelho.</p>
+    <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
+    <p><a href="#" id="terms">Termos de Uso</a> · <a href="#" id="privacy">Política de Privacidade</a></p>
+  `;
+
+  $("modal").classList.remove("hidden");
+
+  $("terms").onclick=e=>{
+    e.preventDefault();
+    legal(true);
+  };
+
+  $("privacy").onclick=e=>{
+    e.preventDefault();
+    legal(false);
+  };
+};
+
+function legal(isTerms){
+  $("modalContent").innerHTML=isTerms
+  ?`
+    <h2>Termos de Uso — Fuot IA</h2>
+    <p>Ao utilizar a Fuot IA, você concorda em utilizar a plataforma de maneira legal, responsável e respeitosa.</p>
+    <p>A Fuot IA oferece respostas geradas por inteligência artificial. Essas respostas podem conter erros, imprecisões ou informações desatualizadas. Confira informações importantes antes de utilizá-las para tomar decisões.</p>
+    <p>Não utilize a plataforma para atividades ilegais, fraudes, ameaças, violação de direitos ou ações que possam prejudicar outras pessoas.</p>
+    <p>O serviço pode passar por atualizações, períodos de indisponibilidade ou alterações de funcionamento.</p>
+    <p>Contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a></p>
+  `
+  :`
+    <h2>Política de Privacidade — Fuot IA</h2>
+    <p>As mensagens e os arquivos enviados são transmitidos ao servidor da Fuot IA hospedado na Cloudflare e processados pelos serviços de inteligência artificial utilizados pela plataforma.</p>
+    <p>O histórico desta versão é armazenado localmente no navegador do usuário. Limpar os dados do navegador pode apagar esse histórico.</p>
+    <p>Os arquivos enviados, como imagens e áudios, são encaminhados ao servidor para realizar as funções solicitadas.</p>
+    <p>A plataforma utiliza informações técnicas da solicitação, como o endereço IP, para aplicar limites de uso e reduzir spam e excesso de solicitações.</p>
+    <p>Evite enviar senhas, dados bancários ou informações pessoais confidenciais.</p>
+    <p>Para dúvidas ou solicitações relacionadas à privacidade, entre em contato: <a href="mailto:contato.fuotia@outlook.com">contato.fuotia@outlook.com</a>.</p>
+    <p><strong>Atenção:</strong> este texto é uma versão inicial e deve ser revisado para refletir todos os serviços, fornecedores e práticas efetivamente utilizados antes do lançamento público.</p>
+  `;
+}
+
+$("closeModal").onclick=()=>$("modal").classList.add("hidden");
+
+$("modal").onclick=e=>{
+  if(e.target===$("modal")){
+    $("modal").classList.add("hidden");
+  }
+};
+
+renderHistory();
+</script>
+</body>
+      </html>
